@@ -10,6 +10,7 @@ port = 9091
 
 conf = { "exe_path" : exe_path, "port" : port }
 
+#env = gym.make("donkey-generated-track-v0", conf=conf)
 env = gym.make("donkey-generated-track-v0", conf=conf)
 
 # PLAY
