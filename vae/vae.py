@@ -5,22 +5,38 @@ import torch.nn as nn
 import math
 import os
 from PIL import Image
+import PIL
 from tqdm import tqdm
-
+from torchvision import datasets, transforms
+import glob
+import random
+import matplotlib.pyplot as plt
 dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+to_image = transforms.ToPILImage()
 
 
-def calculate_log_pi(log_stds, noises, actions):
-    """ 確率論的な行動の確率密度を返す． """
-    # ガウス分布 `N(0, stds * I)` における `noises * stds` の確率密度の対数(= \log \pi(u|a))を計算する．
-    gaussian_log_probs = (-0.5 * noises.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * math.log(
-        2 * math.pi) * log_stds.size(-1)
-    # tanh による確率密度の変化を修正する．
-    return gaussian_log_probs - torch.log(1 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
+def load_pictures():
+    # dataset = datasets(root='/home/emile/Documents/Code/RL_car/train_data', transform=Picture())
+    # dataset = datasets.ImageFolder(root='/home/emile/Documents/Code/RL_car/train_data', transform=transforms.Compose([
+    #     transforms.ToTensor(),
+    # ]))
+    pic_dir = "/home/emile/Documents/Code/RL_car/train_data/pictures"
+    file_name = "_cam-image_array_.jpg"
+    num_file = sum(os.path.isfile(os.path.join(pic_dir, name)) for name in os.listdir(pic_dir))
+    ans = []
+    for index in tqdm(range(num_file)):
+        path = pic_dir + "/" + str(index) + file_name
+        img = np.array(Image.open(path).resize((160, 120)).crop((0, 40, 160, 120)))
+        im = torch.from_numpy(img.reshape((1, 80, 160, 3))).to(dev).permute(0, 3, 1, 2).float().to(dev)
+        ans.append(im/255.0)
+    # ans = torch.utils.data.DataLoader(ans, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
+    random.shuffle(ans)
+    return ans
 
 
-def reparameterize(means, log_stds):
-    stds = log_stds.exp()
+def reparameterize(means, logvar):
+    stds = (0.5*logvar).exp()
     noises = torch.randn_like(means)
     acts = means + noises * stds
     return acts
@@ -28,7 +44,7 @@ def reparameterize(means, log_stds):
 
 class Flatten(nn.Module):
     def forward(self, inputs):
-        return inputs.view(inputs.size(0), -1)
+        return inputs.contiguous().view(inputs.size(0), -1)
 
 
 class UnFlatten(nn.Module):
@@ -37,14 +53,12 @@ class UnFlatten(nn.Module):
         return ans
 
 
-
-class Encoder(nn.Module):
-    def __init__(self, channels=3, h_dim=6144, z_dim=32):
-        super(Encoder, self).__init__()
-        self.channels = channels
-
+class VAE(nn.Module):
+    def __init__(self, image_channels=3, h_dim=6144, z_dim=128):
+        super(VAE, self).__init__()
+        self.z_dim = z_dim
         self.encoder = nn.Sequential(
-            nn.Conv2d(self.channels, 32, kernel_size=4, stride=2),
+            nn.Conv2d(image_channels, 32, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
@@ -53,21 +67,12 @@ class Encoder(nn.Module):
             nn.Conv2d(128, 256, kernel_size=4, stride=2),
             nn.ReLU(),
             Flatten()
-        )
-        self.fc1 = nn.Linear(h_dim, z_dim)
-        self.fc2 = nn.Linear(h_dim, z_dim)
+        ).to(dev)
 
-    def forward(self, inputs):  # encode z. (input -> encoder -> parameterize -> z, means, log_stds)
-        tmp = self.encoder(inputs)
-        means, log_stds = self.fc1(tmp), F.softplus(self.fc2(tmp))
-        z = reparameterize(means, log_stds)
-        return z, means, log_stds
+        self.fc1 = nn.Linear(h_dim, z_dim).to(dev)
+        self.fc2 = nn.Linear(h_dim, z_dim).to(dev)
+        self.fc3 = nn.Linear(z_dim, h_dim).to(dev)
 
-
-class Decoder(nn.Module):
-    def __init__(self, channels=3, h_dim=6144, z_dim=32):
-        super(Decoder, self).__init__()
-        self.channels = channels
         self.decoder = nn.Sequential(
             UnFlatten(),
             nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2),
@@ -76,74 +81,102 @@ class Decoder(nn.Module):
             nn.ReLU(),
             nn.ConvTranspose2d(64, 32, kernel_size=5, stride=2),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, self.channels, kernel_size=4, stride=2),
+            nn.ConvTranspose2d(32, image_channels, kernel_size=4, stride=2),
             nn.Sigmoid(),
-        )
-        self.fc1 = nn.Linear(z_dim, h_dim)
+        ).to(dev)
 
-    def forward(self, inputs):  # decode z. (input -> fc1 -> decoder -> ans)
-        z = self.fc1(inputs)
-        return self.decoder(z)
+    def reparameterize(self, mu, logvar):
+        std = logvar.mul(0.5).exp_()
+        esp = torch.randn(*mu.size()).to(dev)
+        z = mu + std * esp
+        return z
 
+    def bottleneck(self, h):
+        mu, logvar = self.fc1(h), F.softplus(self.fc2(h))
+        z = self.reparameterize(mu, logvar)
+        return z, mu, logvar
 
-class VAE(nn.Module):
-    def __init__(self, channels=3, z_dim=3):
-        # encoder -> z ~ N(\mu, \sigma) -> decoder
-        super(VAE, self).__init__()
-        self.channels = channels
-        self.z_dim = z_dim
-        self.encoder = Encoder().to(dev)
-        self.decoder = Decoder().to(dev)
+    def encode(self, x):
+        h = self.encoder(x)
+        z, mu, logvar = self.bottleneck(h)
+        return z, mu, logvar
 
-    def forward(self, inputs):
-        z, means, log_stds = self.encoder(inputs)
+    def decode(self, z):
+        z = self.fc3(z)
         z = self.decoder(z)
-        return z, means, log_stds
+        return z
 
-    def calc_loss(self, inputs, zs, means, log_stds):
-        kl_loss = (-0.5 * torch.sum((1.0 + log_stds - means.pow_(2) - log_stds.exp()), dim=0)).mean()
-        # print("zs {}".format(zs.shape))
-        # print("ipnuts {}".format(inputs.shape))
-        zs = zs.view(-1, 38400)
-        inputs = inputs.contiguous().view(-1, 38400)
-        loss = F.binary_cross_entropy(zs, inputs, reduction='sum')
-        return loss + 5.0 * kl_loss
+    def forward(self, x):
+        z, mu, logvar = self.encode(x)
+        r_image = self.decode(z)
+        return r_image, mu, logvar, z
+
+    def loss_fn(self, images, r_image, mean, logvar):
+        KL = -0.5 * torch.sum((1 + logvar - mean.pow(2) - logvar.exp()), dim=0)
+        KL = torch.mean(KL)
+        r_image = r_image.contiguous().view(-1, 38400)
+        images = images.contiguous().view(-1, 38400)
+        r_image_loss = F.binary_cross_entropy(r_image, images, reduction='mean')  # size_average=False)
+        # print("loss reconst {}".format(r_image_loss.clone().cpu().detach().numpy()))
+        # print("loss KL {}".format(KL.clone().cpu().detach().numpy()))
+        loss = r_image_loss + 5.0 * KL
+        # print("loss {}".format(loss.clone().cpu().detach().numpy()))
+        return loss
+
+    def evaluate(self, image):
+        plt.ion()
+        r_image, mean, log_var, z = self.forward(image)
+        pre_im = to_image(image.clone().detach().cpu().squeeze(0))
+        im_now = to_image(r_image.clone().detach().cpu().squeeze(0))
+        z = to_image(z.clone().detach().cpu())
+        plt.imshow(pre_im)
+        plt.pause(0.1)
+        plt.imshow(im_now)
+        plt.pause(0.1)
+        plt.imshow(z)
+        plt.pause(0.1)
+        plt.figure()
 
 
 def train_vae(vae, epochs, train_datas):
     optimizer = torch.optim.Adam(vae.parameters(), lr=1e-3)
     vae.train()
+    flag = False
     for epoch in range(epochs):
         losses = []
+        tmp = 0
         for data in tqdm(train_datas):
+            tmp += 1
             images = data.to(dev)
-            optimizer.zero_grad()
-            zs, means, log_stds = vae(images)
-            loss = vae.calc_loss(images, zs, means, log_stds)
-            loss.backward()
-            optimizer.step()
-            losses.append(loss.cpu().detach().numpy())
+            # if not flag:
+            #     vae.evaluate(images)
+            #     flag = True
+            r_images, means, log_var, zs = vae(images)
+            if tmp == 1:
+                loss = vae.loss_fn(images, r_images, means, log_var).to(dev)
+            else:
+                loss += vae.loss_fn(images, r_images, means, log_var).to(dev)
+            if (tmp//6) == 0:
+                loss = loss.mean()
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                tmp = 0
+                losses.append(loss.clone().cpu().detach().numpy())
         print("epoch{}: average loss {}".format(epoch, np.array(losses).mean()))
-        torch.save(vae.state_dict(), './vae.torch', _use_new_zipfile_serialization=False)
+        vae.evaluate(random.choice(train_datas))
+        torch.save(vae.cpu().state_dict(), './vae.pth')
+        vae.to(dev)
+        flag = False
 
 
-def load_pictures():
-    pic_dir = "/home/emile/Documents/Code/RL_car/train_data/pictures"
-    file_name = "_cam-image_array_.jpg"
-    num_file = sum(os.path.isfile(os.path.join(pic_dir, name)) for name in os.listdir(pic_dir))
-    ans = []
-    for index in tqdm(range(num_file)):
-        path = pic_dir + "/" + str(index) + file_name
-        img = np.array(Image.open(path).crop((0, 40, 160, 120)))
-        im = torch.from_numpy(img.reshape((1, 80, 160, 3))).to(dev).permute(0, 3, 1, 2).float()
-        ans.append(im)
-    return ans
+
 
 
 def main():
     vae = VAE()
     pics = load_pictures()
-    train_vae(vae, 1000, pics)
+    train_vae(vae, 50, pics)
 
 
 if __name__ == "__main__":
