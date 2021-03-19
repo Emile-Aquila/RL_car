@@ -3,6 +3,15 @@ import torch
 from SAC_model import ActorNetwork, CriticNetwork
 from algo import Algorithm, ReplayBuffer
 from vae.vae import VAE
+from torchvision import datasets, transforms
+import matplotlib.pyplot as plt
+from PIL import Image
+
+
+def show_state(state_np):
+    state_np_ = state_np[40:120, 0:160, :]
+    img = Image.fromarray(state_np_, "RGB")
+    img.show()
 
 
 class SAC(Algorithm):
@@ -41,7 +50,6 @@ class SAC(Algorithm):
         self.optim_critic = torch.optim.Adam(self.critic.parameters(), lr=lr_critic)
         self.optim_alpha = torch.optim.Adam([self.alpha], lr=lr_alpha)
 
-
         # param
         self.gamma = gamma
         self.tau = tau
@@ -53,22 +61,26 @@ class SAC(Algorithm):
         # VAE
         self.vae = VAE()
         model_path = "./vae/vae.pth"
-        self.vae.load_state_dict(torch.load(model_path)).to(self.dev)
+        # self.vae.load_state_dict(torch.load(model_path)).to(self.dev)
 
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
     def step(self, env, state, t, steps):
         t += 1
+        # state_z = self.convert_state_vae(state)
         if steps <= self.start_steps:  # 最初はランダム.
             action = env.action_space.sample()
         else:
             action, _ = self.explore(state)
+            # action, _ = self.explore(state_z)
         n_state, rew, done, _ = env.step(action)
-
-        # done_masked = False if t == env._max_episode_steps else done  # 最大ステップ数に到達してdone=Trueになった場合を補正する.
-        # self.buffer.append(state, action, rew, done_masked, n_state)  # add data to buffer
+        print("rew is {}".format(rew))
+        # n_state_z = self.convert_state_vae(n_state)  # new
+        # # done_masked = False if t == env._max_episode_steps else done  # 最大ステップ数に到達してdone=Trueになった場合を補正する.
+        # # self.buffer.append(state, action, rew, done_masked, n_state)  # add data to buffer
         self.buffer.append(state, action, rew, done, n_state)  # add data to buffer
+        # self.buffer.append(state_z, action, rew, done, n_state_z)  # add data to buffer
         if done:  # エピソードが終了した場合には，環境をリセットする．
             t = 0
             n_state = env.reset()
@@ -121,3 +133,19 @@ class SAC(Algorithm):
         self.optim_alpha.zero_grad()
         loss.backward()
         self.optim_alpha.step()
+
+    def convert_state_to_tensor(self, state):  # state(array) -> np.array -> convert some -> tensor
+        state1 = np.array(state).reshape((160, 120, 3))
+        # print("state_ shape {}".format(state1.shape))
+        state_ = state[40:120, 0:160, :].reshape((1, 80, 160, 3))
+        # print("state shape {}".format(state_.shape))
+        # state_ = state_.reshape((1, 80, 160, 3))
+        state_ = torch.from_numpy(state_).permute(0, 3, 1, 2).float().to(self.dev)
+        state_ /= 255.0
+        return state_
+
+    def convert_state_vae(self, state):
+        state_ = self.convert_state_to_tensor(state)
+        state_ = self.vae.encode(state_)
+        state_ = state_.clone().detach().cpu()
+        return state_

@@ -44,7 +44,7 @@ trainer = Trainer(
     num_steps=NUM_STEPS,
     eval_interval=EVAL_INTERVAL,
 )
-
+print("start train")
 trainer.train()
 # trainer.plot()
 trainer.visualize()

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import gym
 from time import time
 from datetime import timedelta
+from PIL import Image
 
 
 class Algorithm(ABC):
@@ -100,8 +101,9 @@ class Trainer:
         for steps in range(1, self.num_steps + 1):
             # 環境(self.env)，現在の状態(state)，現在のエピソードのステップ数(t)，今までのトータルのステップ数(steps)を
             # アルゴリズムに渡し，状態・エピソードのステップ数を更新する．
+            print("test 2")
             state, t = self.algo.step(self.env, state, t, steps)
-
+            print("test3")
             if self.algo.is_update(steps):  # アルゴリズムが準備できていれば，1回学習を行う．
                 self.algo.update()
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
@@ -174,3 +176,6 @@ def reparameterize(means, log_stds):
     acts = torch.tanh(tmp)
     log_pis = calc_log_pi(stds=stds, noises=noises, actions=acts)
     return acts, log_pis
+
+
+
