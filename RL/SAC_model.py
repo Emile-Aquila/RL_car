@@ -8,7 +8,8 @@ class ActorNetwork(nn.Module):
         super().__init__()
         num = 256
         self.net = nn.Sequential(
-            nn.Linear(state_shape[0], num),
+            # nn.Linear(state_shape[0], num),
+            nn.Linear(state_shape[1], num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),

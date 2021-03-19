@@ -57,33 +57,31 @@ class SAC(Algorithm):
         self.start_steps = start_steps
         self.batch_size = batch_size
         self.learning_steps = 0
-
-        # VAE
-        self.vae = VAE()
-        model_path = "./vae/vae.pth"
-        # self.vae.load_state_dict(torch.load(model_path)).to(self.dev)
+        self.total_rew = 0.0
 
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
     def step(self, env, state, t, steps):
         t += 1
-        # state_z = self.convert_state_vae(state)
         if steps <= self.start_steps:  # 最初はランダム.
             action = env.action_space.sample()
         else:
             action, _ = self.explore(state)
             # action, _ = self.explore(state_z)
         n_state, rew, done, _ = env.step(action)
-        print("rew is {}".format(rew))
-        # n_state_z = self.convert_state_vae(n_state)  # new
+        if steps <= self.start_steps:
+            action /= 10.0
+        self.total_rew += rew
+        # print("rew is {}".format(rew))
         # # done_masked = False if t == env._max_episode_steps else done  # 最大ステップ数に到達してdone=Trueになった場合を補正する.
         # # self.buffer.append(state, action, rew, done_masked, n_state)  # add data to buffer
         self.buffer.append(state, action, rew, done, n_state)  # add data to buffer
-        # self.buffer.append(state_z, action, rew, done, n_state_z)  # add data to buffer
         if done:  # エピソードが終了した場合には，環境をリセットする．
+            print("total rew is {}".format(self.total_rew))
             t = 0
             n_state = env.reset()
+            self.total_rew = 0.0
         return n_state, t
 
     def update_critic(self, states, actions, rews, dones, n_states):
@@ -134,18 +132,4 @@ class SAC(Algorithm):
         loss.backward()
         self.optim_alpha.step()
 
-    def convert_state_to_tensor(self, state):  # state(array) -> np.array -> convert some -> tensor
-        state1 = np.array(state).reshape((160, 120, 3))
-        # print("state_ shape {}".format(state1.shape))
-        state_ = state[40:120, 0:160, :].reshape((1, 80, 160, 3))
-        # print("state shape {}".format(state_.shape))
-        # state_ = state_.reshape((1, 80, 160, 3))
-        state_ = torch.from_numpy(state_).permute(0, 3, 1, 2).float().to(self.dev)
-        state_ /= 255.0
-        return state_
 
-    def convert_state_vae(self, state):
-        state_ = self.convert_state_to_tensor(state)
-        state_ = self.vae.encode(state_)
-        state_ = state_.clone().detach().cpu()
-        return state_

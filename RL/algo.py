@@ -55,6 +55,7 @@ class ReplayBuffer:
         self.next_states = torch.empty((buffer_size, *state_shape), dtype=torch.float, device=self.dev)
 
     def append(self, state, action, reward, done, next_state):
+        stat = torch.from_numpy(state)
         self.states[self._idx].copy_(torch.from_numpy(state))
         self.actions[self._idx].copy_(torch.from_numpy(action))
         self.rewards[self._idx] = float(reward)
@@ -81,13 +82,13 @@ def wrap_monitor(env):
 
 class Trainer:
     # def __init__(self, env, env_test, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=3):
-    def __init__(self, env, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=3):
+    def __init__(self, env, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=1):
         self.env = env
         self.env_test = env
         self.algo = algo
         # 環境の乱数シードを設定する．
         self.env.seed(seed)
-        self.env_test.seed(2 ** 31 - seed)
+        # self.env_test.seed(2 ** 31 - seed)
 
         self.returns = {'step': [], 'return': []}  # 平均収益を保存するための辞書．
         self.num_steps = num_steps  # データ収集を行うステップ数．
@@ -101,9 +102,9 @@ class Trainer:
         for steps in range(1, self.num_steps + 1):
             # 環境(self.env)，現在の状態(state)，現在のエピソードのステップ数(t)，今までのトータルのステップ数(steps)を
             # アルゴリズムに渡し，状態・エピソードのステップ数を更新する．
-            print("test 2")
+            # print("test 2")
             state, t = self.algo.step(self.env, state, t, steps)
-            print("test3")
+            # print("test3")
             if self.algo.is_update(steps):  # アルゴリズムが準備できていれば，1回学習を行う．
                 self.algo.update()
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
