@@ -1,4 +1,5 @@
-/train_data
-/unitylog.txt
+/RL/train_data
+/RL/unitylog.txt
+/RL/__pycache__
 /.idea
 /mp4
