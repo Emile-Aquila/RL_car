@@ -9,7 +9,7 @@ class ActorNetwork(nn.Module):
         num = 256
         self.net = nn.Sequential(
             # nn.Linear(state_shape[0], num),
-            nn.Linear(state_shape[1], num),
+            nn.Linear(state_shape, num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
@@ -36,14 +36,14 @@ class CriticNetwork(nn.Module):
         super().__init__()
         num = 256
         self.net1 = nn.Sequential(
-            nn.Linear(state_shape[0] + action_shape[0], num),
+            nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
             nn.Linear(num, 1),
         )
         self.net2 = nn.Sequential(
-            nn.Linear(state_shape[0] + action_shape[0], num),
+            nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
@@ -52,7 +52,6 @@ class CriticNetwork(nn.Module):
 
     def forward(self, states, actions):
         inputs = torch.cat((states, actions), dim=-1)
-        # print("inputs shape {}".format(inputs.shape))
         return self.net1(inputs), self.net2(inputs)
 
 

@@ -17,7 +17,7 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0,
                  batch_size=256, gamma=0.99, lr_actor=3e-4, lr_critic=3e-4, lr_alpha=3e-4,
-                 buffer_size=10 ** 4, start_steps=10 ** 4, tau=5e-3, min_alpha=0.05, reward_scale=1.0):
+                 buffer_size=10 ** 4, start_steps=5 * 10 ** 3, tau=5e-3, min_alpha=0.05, reward_scale=1.0):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -65,15 +65,13 @@ class SAC(Algorithm):
     def step(self, env, state, t, steps):
         t += 1
         if steps <= self.start_steps:  # 最初はランダム.
-            action = env.action_space.sample()
+            action = env.action_space.sample() / 10.0
         else:
             action, _ = self.explore(state)
             # action, _ = self.explore(state_z)
         n_state, rew, done, _ = env.step(action)
-        if steps <= self.start_steps:
-            action /= 10.0
         self.total_rew += rew
-        # print("rew is {}".format(rew))
+        print("rew is {}".format(rew))
         # # done_masked = False if t == env._max_episode_steps else done  # 最大ステップ数に到達してdone=Trueになった場合を補正する.
         # # self.buffer.append(state, action, rew, done_masked, n_state)  # add data to buffer
         self.buffer.append(state, action, rew, done, n_state)  # add data to buffer
@@ -119,7 +117,6 @@ class SAC(Algorithm):
     def update(self):
         self.learning_steps += 1
         states, actions, rews, dones, n_states = self.buffer.sample(self.batch_size)
-
         self.update_critic(states, actions, rews, dones, n_states)
         self.update_actor(states)
         self.update_target()

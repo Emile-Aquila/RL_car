@@ -1,7 +1,7 @@
 import torch
 from algo import Trainer
-import pybullet_envs
-import pybullet
+# import pybullet_envs
+# import pybullet
 import gym_donkeycar
 import gym
 from SAC import SAC
@@ -27,13 +27,13 @@ print("acts shape {}".format(*env.action_space.shape))
 SEED = 0
 REWARD_SCALE = 1.0
 # NUM_STEPS = 5 * 10 ** 4
-NUM_STEPS = 5 * 10 ** 3
+NUM_STEPS = 5 * 10 ** 7
 EVAL_INTERVAL = 5 * 10 ** 2
 # EVAL_INTERVAL = 1 * 10
 
 algo = SAC(
     # state_shape=env.observation_space.shape,
-    state_shape=(1, 32),
+    state_shape=32,
     action_shape=env.action_space.shape,
     seed=SEED,
     reward_scale=REWARD_SCALE,
@@ -50,5 +50,5 @@ trainer = Trainer(
 print("start train")
 trainer.train()
 # trainer.plot()
-trainer.visualize()
+# trainer.visualize()
 # trainer.visualize()

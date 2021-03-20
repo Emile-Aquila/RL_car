@@ -48,11 +48,11 @@ class ReplayBuffer:
         self.buffer_size = buffer_size  # リプレイバッファのサイズ．
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.states = torch.empty((buffer_size, *state_shape), dtype=torch.float, device=self.dev)
+        self.states = torch.empty((buffer_size, state_shape), dtype=torch.float, device=self.dev)
         self.actions = torch.empty((buffer_size, *action_shape), dtype=torch.float, device=self.dev)
         self.rewards = torch.empty((buffer_size, 1), dtype=torch.float, device=self.dev)
         self.dones = torch.empty((buffer_size, 1), dtype=torch.float, device=self.dev)
-        self.next_states = torch.empty((buffer_size, *state_shape), dtype=torch.float, device=self.dev)
+        self.next_states = torch.empty((buffer_size, state_shape), dtype=torch.float, device=self.dev)
 
     def append(self, state, action, reward, done, next_state):
         stat = torch.from_numpy(state)
@@ -82,7 +82,7 @@ def wrap_monitor(env):
 
 class Trainer:
     # def __init__(self, env, env_test, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=3):
-    def __init__(self, env, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=1):
+    def __init__(self, env, algo, seed=0, num_steps=10 ** 8, eval_interval=10 ** 4, num_eval_episodes=1):
         self.env = env
         self.env_test = env
         self.algo = algo
@@ -118,6 +118,7 @@ class Trainer:
             episode_return = 0.0
             while (not done):
                 action = self.algo.exploit(state)
+                print(" eval action {}".format(action))
                 state, reward, done, _ = self.env_test.step(action)
                 episode_return += reward
 
