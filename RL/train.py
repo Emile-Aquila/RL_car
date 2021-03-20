@@ -5,18 +5,15 @@ from algo import Trainer
 import gym_donkeycar
 import gym
 from SAC import SAC
-from vae.vae import VAE
 from env import MyEnv
 dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
 exe_path = f"/home/emile/.local/lib/python3.9/site-packages/gym_donkeycar/DonkeySimLinux/donkey_sim.x86_64"
-port = 9091
-conf = {"exe_path": exe_path, "port": port}
-
+conf = {"exe_path": exe_path, "port": 9091}
 env = gym.make("donkey-generated-track-v0", conf=conf)
+# env2 = gym.make("donkey-generated-track-v0")
 env = MyEnv(env)
+# env2 = MyEnv(env2)
 # env_test = gym.make("donkey-generated-track-v0", conf=conf)
-
 # print("obs shape {}".format(env.observation_space.shape))
 # print("obs shape {}".format(*env.observation_space.shape))
 print("acts shape {}".format(env.action_space.shape))

@@ -2,10 +2,8 @@ import numpy as np
 import torch
 from SAC_model import ActorNetwork, CriticNetwork
 from algo import Algorithm, ReplayBuffer
-from vae.vae import VAE
-from torchvision import datasets, transforms
-import matplotlib.pyplot as plt
 from PIL import Image
+
 
 
 def show_state(state_np):
@@ -68,7 +66,6 @@ class SAC(Algorithm):
             action = env.action_space.sample() / 10.0
         else:
             action, _ = self.explore(state)
-            # action, _ = self.explore(state_z)
         n_state, rew, done, info = env.step(action)
         self.total_rew += rew
         # print("rew is {}".format(rew))
@@ -99,6 +96,7 @@ class SAC(Algorithm):
         self.optim_critic.zero_grad()
         (loss_c1 + loss_c2).backward(retain_graph=False)
         self.optim_critic.step()
+        return loss_c1.clone().detach(), loss_c2.clone().detach()
 
     def update_actor(self, states):
         acts, log_pis = self.actor.sample(states)
@@ -109,6 +107,7 @@ class SAC(Algorithm):
         loss_actor.backward(retain_graph=False)
         self.optim_actor.step()
         self.entropy_adjust_func(log_pis)
+        return loss_actor.clone().detach()
 
     def update_target(self):
         for target, trained in zip(self.critic_target.parameters(), self.critic.parameters()):
@@ -118,9 +117,10 @@ class SAC(Algorithm):
     def update(self):
         self.learning_steps += 1
         states, actions, rews, dones, n_states = self.buffer.sample(self.batch_size)
-        self.update_critic(states, actions, rews, dones, n_states)
-        self.update_actor(states)
+        l_c1, l_c2 = self.update_critic(states, actions, rews, dones, n_states)
+        l_a1 = self.update_actor(states)
         self.update_target()
+        return l_a1, l_c1, l_c2
 
     def entropy_adjust_func(self, log_pis):
         with torch.no_grad():

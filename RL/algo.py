@@ -7,6 +7,8 @@ import gym
 from time import time
 from datetime import timedelta
 from PIL import Image
+from torch.utils.tensorboard import SummaryWriter
+
 
 
 class Algorithm(ABC):
@@ -97,21 +99,31 @@ class Trainer:
 
     def train(self):  # num_stepsステップの間，データ収集・学習・評価を繰り返す．
         self.start_time = time()  # 学習開始の時間
+        writer = SummaryWriter(log_dir="./logs")
+        dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1, 32))).float().to(dev))
+        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32))).float().to(dev),
+                         torch.from_numpy(np.zeros(shape=(1, 2))).float().to(dev)))
+
         t = 0  # エピソードのステップ数．
         state = self.env.reset()  # 環境を初期化する．
         for steps in range(1, self.num_steps + 1):
             # 環境(self.env)，現在の状態(state)，現在のエピソードのステップ数(t)，今までのトータルのステップ数(steps)を
             # アルゴリズムに渡し，状態・エピソードのステップ数を更新する．
-            # print("test 2")
             state, t = self.algo.step(self.env, state, t, steps)
-            # print("test3")
             if self.algo.is_update(steps):  # アルゴリズムが準備できていれば，1回学習を行う．
-                self.algo.update()
+                l_a1, l_c1, l_c2 = self.algo.update()
+                writer.add_scalar("actor loss", l_a1, steps)
+                writer.add_scalar("critic loss1", l_c1, steps)
+                writer.add_scalar("critic loss2", l_c2, steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
-                self.evaluate(steps)
+                rew_ave = self.evaluate(steps)
+                writer.add_scalar("evaluate rew", rew_ave, steps)
+        writer.close()
 
     def evaluate(self, steps):  # 複数エピソード環境を動かし，平均収益を記録する．
         returns = []
+        ave_rew = 0.0
         for _ in range(self.num_eval_episodes):
             state = self.env_test.reset()
             done = False
@@ -121,9 +133,9 @@ class Trainer:
                 print(" eval action {}".format(action))
                 state, reward, done, _ = self.env_test.step(action)
                 episode_return += reward
-
+            ave_rew += episode_return
             returns.append(episode_return)
-
+        ave_rew /= self.num_eval_episodes
         mean_return = np.mean(returns)
         self.returns['step'].append(steps)
         self.returns['return'].append(mean_return)
@@ -131,6 +143,7 @@ class Trainer:
         print(f'Num steps: {steps:<6}   '
               f'Return: {mean_return:<5.1f}   '
               f'Time: {self.time}')
+        return ave_rew
 
     def visualize(self):
         """ 1エピソード環境を動かし，mp4を再生する． """
