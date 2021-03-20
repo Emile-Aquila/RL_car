@@ -20,16 +20,23 @@ class MyEnv:
         n_state, rew, done, info = self.env.step(action*10.0)
         n_state = self.convert_state_vae(n_state)
         rew = self.change_rew(rew, info)
+        if info["cte"] > 3.5:
+            done = True
+            rew = -1.0
+        elif info["cte"] < -5.0:
+            done = True
+            rew = -1.0
         return n_state, rew, done, info
 
     def change_rew(self, rew, info):
         if info["speed"] < 0.0:
-            rew = -0.6
+            return -0.6
+        elif abs(info["cte"]) >= 2.0:
+            return -1.0
         if rew > 0.0:
+            rew /= 20.0
             if info["speed"] < 3.0:
-                return 0.0
-            rew /= 10.0
-            rew += info["speed"] / 20.0
+                rew += info["speed"] / 40.0
         return rew
 
     def reset(self):
