@@ -23,14 +23,13 @@ class MyEnv:
         return n_state, rew, done, info
 
     def change_rew(self, rew, info):
-
+        if info["speed"] < 0.0:
+            rew = -0.6
         if rew > 0.0:
             if info["speed"] < 3.0:
                 return 0.0
             rew /= 10.0
             rew += info["speed"] / 20.0
-        if info["speed"] < 0.0:
-            rew = -0.6
         return rew
 
     def reset(self):
