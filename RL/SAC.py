@@ -64,7 +64,7 @@ class SAC(Algorithm):
         t += 1
         if steps <= self.start_steps:  # 最初はランダム.
             action = env.action_space.sample()
-            print("action {}".format(action))
+            # print("action {}".format(action))
         else:
             action, _ = self.explore(state)
         n_state, rew, done, info = env.step(action)
