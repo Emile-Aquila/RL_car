@@ -25,7 +25,7 @@ SEED = 0
 REWARD_SCALE = 1.0
 # NUM_STEPS = 5 * 10 ** 4
 NUM_STEPS = 5 * 10 ** 7
-EVAL_INTERVAL = 5 * 10 ** 2
+EVAL_INTERVAL = 1 * 10 ** 4
 # EVAL_INTERVAL = 1 * 10
 
 algo = SAC(

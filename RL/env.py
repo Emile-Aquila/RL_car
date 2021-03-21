@@ -1,7 +1,7 @@
 from vae.vae import VAE
 import numpy as np
 import torch
-import cv2
+# import cv2
 
 # fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
 # fps = 60
@@ -41,8 +41,8 @@ class MyEnv:
             return -1.0
         if rew > 0.0:
             rew /= 20.0
-            if info["speed"] < 3.0:
-                rew += info["speed"] / 40.0
+            if info["speed"] > 3.0:
+                rew += info["speed"] / 30.0
         return rew
 
     def reset(self):
