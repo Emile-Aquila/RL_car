@@ -1,6 +1,12 @@
 from vae.vae import VAE
 import numpy as np
 import torch
+import cv2
+
+# fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+# fps = 60
+# out = cv2.VideoWriter('./log/output.mp4', fourcc, fps, (80, 160))
+
 
 
 class MyEnv:
