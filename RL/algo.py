@@ -10,7 +10,6 @@ from PIL import Image
 from torch.utils.tensorboard import SummaryWriter
 
 
-
 class Algorithm(ABC):
     def explore(self, state):  # 確率論的な行動と，その行動の確率密度の対数 \log(\pi(a|s)) を返す.
         dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -78,14 +77,16 @@ class ReplayBuffer:
         )
 
 
-def wrap_monitor(env):
-    return gym.wrappers.Monitor(env, './mp4', video_callable=lambda x: True, force=True)
+# def wrap_monitor(env):
+#     return gym.wrappers.Monitor(env, './mp4', video_callable=lambda x: True, force=True)
 
 
 class Trainer:
     # def __init__(self, env, env_test, algo, seed=0, num_steps=10 ** 6, eval_interval=10 ** 4, num_eval_episodes=3):
-    def __init__(self, env, algo, seed=0, num_steps=10 ** 8, eval_interval=10 ** 4, num_eval_episodes=1):
+    # def __init__(self, env, algo, seed=0, num_steps=10 ** 8, eval_interval=10 ** 4, num_eval_episodes=1):
+    def __init__(self, env, algo, seed=0, num_steps=10 ** 8, eval_interval=10 ** 2, num_eval_episodes=1):
         self.env = env
+        # self.env_test = wrap_monitor(env)
         self.env_test = env
         self.algo = algo
         # 環境の乱数シードを設定する．
@@ -96,6 +97,8 @@ class Trainer:
         self.num_steps = num_steps  # データ収集を行うステップ数．
         self.eval_interval = eval_interval  # 評価の間のステップ数(インターバル)．
         self.num_eval_episodes = num_eval_episodes  # 評価を行うエピソード数．
+
+        self.eval_id = 0  # 現在のevalの番号
 
     def train(self):  # num_stepsステップの間，データ収集・学習・評価を繰り返す．
         self.start_time = time()  # 学習開始の時間
@@ -117,6 +120,7 @@ class Trainer:
                 writer.add_scalar("critic loss1", l_c1, steps)
                 writer.add_scalar("critic loss2", l_c2, steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
+                # print("evaluate")
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
         writer.close()
@@ -130,8 +134,8 @@ class Trainer:
             episode_return = 0.0
             while (not done):
                 action = self.algo.exploit(state)
-                print(" eval action {}".format(action))
-                state, reward, done, _ = self.env_test.step(action)
+                # print(" eval action {}".format(action))
+                state, reward, done, _ = self.env_test.step(action, True)
                 episode_return += reward
             ave_rew += episode_return
             returns.append(episode_return)
@@ -143,19 +147,20 @@ class Trainer:
         print(f'Num steps: {steps:<6}   '
               f'Return: {mean_return:<5.1f}   '
               f'Time: {self.time}')
+        self.env_test.generate_mp4()
         return ave_rew
 
-    def visualize(self):
-        """ 1エピソード環境を動かし，mp4を再生する． """
-        env = wrap_monitor(gym.make(self.env.unwrapped.spec.id))
-        state = env.reset()
-        done = False
-
-        while not done:
-            action = self.algo.exploit(state)
-            state, rew, done, _ = env.step(action)
-            env.render()
-        del env
+    # def visualize(self):
+    #     """ 1エピソード環境を動かし，mp4を再生する． """
+    #     env = wrap_monitor(gym.make(self.env.unwrapped.spec.id))
+    #     state = env.reset()
+    #     done = False
+    #
+    #     while not done:
+    #         action = self.algo.exploit(state)
+    #         state, rew, done, _ = env.step(action)
+    #         env.render()
+    #     del env
 
     def plot(self):
         """ 平均収益のグラフを描画する． """

@@ -1,12 +1,11 @@
 from vae.vae import VAE
 import numpy as np
 import torch
-# import cv2
-
-# fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-# fps = 60
-# out = cv2.VideoWriter('./log/output.mp4', fourcc, fps, (80, 160))
-
+import gym
+from PIL import Image
+import cv2
+import os
+import shutil
 
 
 class MyEnv:
@@ -21,9 +20,13 @@ class MyEnv:
         model_path = "./vae/vae.pth"
         self.vae.load_state_dict(torch.load(model_path))
         self.vae.to(self.dev)
+        self._gen_id = 0  # 何回目のgenerateかを保持
+        self._frames = []  # mp4生成用にframeを保存
 
-    def step(self, action):
-        n_state, rew, done, info = self.env.step(action*10.0)
+    def step(self, action, show=False):
+        n_state, rew, done, info = self.env.step(action)
+        if show:
+            self._frames.append(np.array(n_state))
         n_state = self.convert_state_vae(n_state)
         rew = self.change_rew(rew, info)
         if info["cte"] > 3.5:
@@ -68,3 +71,31 @@ class MyEnv:
         state_, _, _ = self.vae.encode(state_)
         state_ = state_.clone().detach().cpu().numpy()[0]
         return state_
+
+    def generate_mp4(self):
+        # for mp4
+        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        fps = 10
+        video = cv2.VideoWriter('./mp4/output' + str(self._gen_id) + ".mp4", fourcc, fps, (120, 160))
+        if not video.isOpened():
+            print("can't be opened")
+        # for path
+        os.mkdir("./tmp")
+        current_path = os.getcwd()  # 現在のディレクトリ
+        # main procedure
+        for idx, frame in enumerate(self._frames):
+            fram = Image.fromarray(frame, "RGB")
+            path = current_path + "/tmp/frame" + str(idx) + ".png"
+            fram.save(path, 'PNG')
+            img = cv2.imread(path)
+            img = cv2.resize(img, (120, 160))
+            if img is None:
+                print("can't read")
+                break
+            video.write(img)
+        video.release()
+        shutil.rmtree("./tmp")
+        self._frames.clear()
+        self._gen_id += 1
+
+

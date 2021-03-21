@@ -5,7 +5,6 @@ from algo import Algorithm, ReplayBuffer
 from PIL import Image
 
 
-
 def show_state(state_np):
     state_np_ = state_np[40:120, 0:160, :]
     img = Image.fromarray(state_np_, "RGB")
@@ -16,6 +15,7 @@ class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0,
                  batch_size=256, gamma=0.99, lr_actor=3e-4, lr_critic=3e-4, lr_alpha=3e-4,
                  buffer_size=10 ** 4, start_steps=5 * 10 ** 3, tau=5e-3, min_alpha=0.05, reward_scale=1.0):
+                 #   buffer_size = 10 ** 4, start_steps = 3, tau = 5e-3, min_alpha = 0.05, reward_scale = 1.0):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -63,7 +63,8 @@ class SAC(Algorithm):
     def step(self, env, state, t, steps):
         t += 1
         if steps <= self.start_steps:  # 最初はランダム.
-            action = env.action_space.sample() / 10.0
+            action = env.action_space.sample()
+            print("action {}".format(action))
         else:
             action, _ = self.explore(state)
         n_state, rew, done, info = env.step(action)
@@ -74,7 +75,7 @@ class SAC(Algorithm):
         # # self.buffer.append(state, action, rew, done_masked, n_state)  # add data to buffer
         self.buffer.append(state, action, rew, done, n_state)  # add data to buffer
         if done:  # エピソードが終了した場合には，環境をリセットする．
-            print("total rew is {}".format(self.total_rew))
+            # print("total rew is {}".format(self.total_rew))
             t = 0
             n_state = env.reset()
             self.total_rew = 0.0
