@@ -21,7 +21,6 @@ NUM_STEPS = 5 * 10 ** 7
 # NUM_STEPS = 10**2
 EVAL_INTERVAL = 1 * 10 ** 4
 
-
 algo = SAC(
     # state_shape=env.observation_space.shape,
     state_shape=32,

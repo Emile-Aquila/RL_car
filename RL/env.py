@@ -76,7 +76,8 @@ class MyEnv:
         # for mp4
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         fps = 10
-        video = cv2.VideoWriter('./mp4/output' + str(self._gen_id) + ".mp4", fourcc, fps, (120, 160))
+        current_path = os.getcwd()  # 現在のディレクトリ
+        video = cv2.VideoWriter(current_path + '/mp4/output' + str(self._gen_id) + ".mp4", fourcc, fps, (120, 160))
         if not video.isOpened():
             print("can't be opened")
         # for path
