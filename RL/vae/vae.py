@@ -120,14 +120,16 @@ class VAE(nn.Module):
         im_now = to_image(r_image[0].clone().detach().cpu().squeeze(0))
         #z = to_image(z[0].clone().detach().cpu())
         plt.imshow(pre_im)
-        #(f'{output_dir}/original_{epoch}.png',pre_im)
-        plt.pause(0.1)
+        plt.show()
+        #plt.imsave(f'{output_dir}/original_{epoch}.png',pre_im)
+        #plt.pause(0.1)
         plt.imshow(im_now)
         #plt.imsave(f'{output_dir}/Generate_{epoch}.png',im_now)
-        plt.pause(0.1)
+        #plt.pause(0.1)
         #plt.imshow(z)
         #plt.pause(0.1)
         #plt.figure()
+        plt.show()
 
 
 def train_vae(vae, epochs, train_datas,output_dir):
@@ -152,8 +154,8 @@ def train_vae(vae, epochs, train_datas,output_dir):
         print(f'kl:{kl} re:{re}')
 
         
-        if epoch%10==0:
-            vae.evaluate(images,epoch,output_dir)
+        #if epoch%3==0:
+        vae.evaluate(images,epoch,output_dir)
         torch.save(vae.cpu().state_dict(), f'{output_dir}/vae.pth')
         vae.to(dev)
         flag = False
@@ -163,7 +165,7 @@ def train_vae(vae, epochs, train_datas,output_dir):
 
 
 def main():
-    output_dir='./output/correct'
+    output_dir='./output/test'
     vae = VAE()
     pics = load_pictures()
     train_vae(vae, 50, pics,output_dir)
